@@ -1,48 +1,87 @@
 <!DOCTYPE html>
-<html>
-  <head>
-    <meta name="viewport" content="width=device-width,initial-scale=1.0">
-    <title>Socket.IO chat</title>
-    <style>
-      body { margin: 0; padding-bottom: 3rem; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
+<html lang="en">
+<head>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>WebRTC Chat</title>
+  <style>
+    /* Your styles here */
+  </style>
+</head>
+<body>
+  <video id="localVideo" autoplay muted></video>
+  <div id="remoteVideos"></div>
+  <ul id="conversation"></ul>
+  <form id="form" action="">
+    <input id="input" autocomplete="off" /><button>Send</button>
+  </form>
+  <button id="leaveRoomBtn">Leave Room</button>
+  <script src="https://cdn.jsdelivr.net/npm/socket.io-client@4.0.1/dist/socket.io.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/simple-peer@9.11.1/simplepeer.min.js"></script>
 
-      #form { background: rgba(0, 0, 0, 0.15); padding: 0.25rem; position: fixed; bottom: 0; left: 0; right: 0; display: flex; height: 3rem; box-sizing: border-box; backdrop-filter: blur(10px); }
-      #input { border: none; padding: 0 1rem; flex-grow: 1; border-radius: 2rem; margin: 0.25rem; }
-      #input:focus { outline: none; }
-      #form > button { background: #333; border: none; padding: 0 1rem; margin: 0.25rem; border-radius: 3px; outline: none; color: #fff; }
-
-      #messages { list-style-type: none; margin: 0; padding: 0; }
-      #messages > li { padding: 0.5rem 1rem; }
-      #messages > li:nth-child(odd) { background: #efefef; }
-    </style>
-  </head>
-  <script src="http://localhost:3000/socket.io/socket.io.js"></script>
   <script>
-    document.addEventListener('DOMContentLoaded', (event) => {
+    document.addEventListener('DOMContentLoaded', () => {
       const socket = io();
       const form = document.getElementById('form');
       const input = document.getElementById('input');
-      const messages = document.getElementById('messages');
-  
-      form.addEventListener('submit', (e) => {
-        e.preventDefault();
-        if (input.value) {
-          socket.emit('chat message', input.value);
-          input.value = '';
+      const conversation = document.getElementById('conversation');
+      const localVideo = document.getElementById('localVideo');
+      const remoteVideos = document.getElementById('remoteVideos');
+      let peerConnection;
+
+      navigator.mediaDevices.getUserMedia({ video: true, audio: true })
+        .then((stream) => {
+          localVideo.srcObject = stream;
+
+          // Initialize a new WebRTC peer connection
+          peerConnection = new SimplePeer({ initiator: true, trickle: false, stream });
+
+          // Send chat messages
+          form.addEventListener('submit', (e) => {
+            e.preventDefault();
+            console.log("hii");
+            if (input.value) {
+              socket.emit('chat message', input.value);
+              input.value = '';
+            }
+          });
+
+          // Receive and display chat messages
+          socket.on('chat message', (msg) => {
+            const item = document.createElement('li');
+            item.textContent = msg;
+            conversation.appendChild(item);
+            window.scrollTo(0, document.body.scrollHeight);
+          });
+
+          // WebRTC event listeners
+          peerConnection.on('signal', (signal) => {
+            socket.emit('offer', { signal });
+          });
+
+          peerConnection.on('stream', (remoteStream) => {
+            const remoteVideo = document.createElement('video');
+            remoteVideo.srcObject = remoteStream;
+            remoteVideo.autoplay = true;
+            remoteVideos.appendChild(remoteVideo);
+          });
+
+          socket.on('answer', (data) => {
+            peerConnection.signal(data.signal);
+          });
+        })
+        .catch((error) => {
+          console.error('Error accessing media devices:', error);
+        });
+
+      // Handle leaving the room
+      document.getElementById('leaveRoomBtn').addEventListener('click', () => {
+        if (peerConnection) {
+          peerConnection.destroy();  // Close the WebRTC connection
+          localVideo.srcObject.getTracks().forEach((track) => track.stop());
+          localVideo.srcObject = null;
         }
       });
-   socket.on('chat message', (msg) => {
-    const item = document.createElement('li');
-    item.textContent = msg;
-    messages.appendChild(item);
-    window.scrollTo(0, document.body.scrollHeight);
-  });
     });
-  </script>  
-  <body>
-    <ul id="messages"></ul>
-    <form id="form" action="">
-      <input id="input" autocomplete="off" /><button>Send</button>
-    </form>
-  </body>
+  </script>
+</body>
 </html>

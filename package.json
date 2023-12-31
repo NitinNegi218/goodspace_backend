@@ -15,6 +15,8 @@
     "http": "^0.0.1-security",
     "mongoose": "^8.0.3",
     "path": "^0.12.7",
+    "process": "^0.11.10",
+    "simple-peer": "^9.11.1",
     "socket.io": "^4.7.2"
   }
 }
